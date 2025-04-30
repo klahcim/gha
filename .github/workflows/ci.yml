@@ -1,19 +1,40 @@
-# .github/workflows/log-commit-message.yml
-name: Log Commit Message
+# .github/workflows/log-tag-commits.yml
+name: Log Commits Since Last Tag
 
 on:
-  push: {}
+  create:
+    # reaguj tylko na tworzenie tagów
+    tags: true
 
 jobs:
-  log-message:
+  log-tagged-commits:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Pobierz kod (potrzebne, by mieć dostęp do git)
-      - name: Checkout repository
+      # 1. Pobierz cały repozytorium wraz z historią
+      - name: Checkout repository with history
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # konieczne, by mieć wszystkie wcześniejsze tagi i commity
 
-      # 2. Echo commit message do logów
-      - name: Log commit message
+      # 2. Pobierz listę tagów posortowaną chronologicznie
+      - name: Get last two tags
+        id: tags
         run: |
-          echo "Commit message: ${{ github.event.head_commit.message }}"
+          # Pobieramy wszystkie tagi, sortujemy po dacie utworzenia, bierzemy dwa ostatnie
+          TAGS=$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags)
+          LAST_TAG=$(echo "$TAGS" | sed -n '1p')
+          PREV_TAG=$(echo "$TAGS" | sed -n '2p' || echo "")
+          echo "last=$LAST_TAG" >> $GITHUB_OUTPUT
+          echo "previous=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      # 3. Wypisz commity między poprzednim i bieżącym tagiem
+      - name: Log commits between tags
+        run: |
+          if [ -z "${{ steps.tags.outputs.previous }}" ]; then
+            echo "No previous tag found. Showing all commits up to ${{ steps.tags.outputs.last }}:"
+            git log --pretty=format:'- %h %s' ${{ steps.tags.outputs.last }}
+          else
+            echo "Commits from ${{ steps.tags.outputs.previous }} to ${{ steps.tags.outputs.last }}:"
+            git log --pretty=format:'- %h %s' ${{ steps.tags.outputs.previous }}..${{ steps.tags.outputs.last }}
+          fi
