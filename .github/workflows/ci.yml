@@ -1,0 +1,19 @@
+# .github/workflows/log-commit-message.yml
+name: Log Commit Message
+
+on:
+  push: {}
+
+jobs:
+  log-message:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Pobierz kod (potrzebne, by mieć dostęp do git)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Echo commit message do logów
+      - name: Log commit message
+        run: |
+          echo "Commit message: ${{ github.event.head_commit.message }}"
