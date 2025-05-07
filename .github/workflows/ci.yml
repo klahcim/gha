@@ -5,15 +5,18 @@ on:
     tags: true
 
 jobs:
-  update-jira-fix-versions:
+  extract-data:
     runs-on: ubuntu-latest
+    outputs:
+      fix_version: ${{ steps.extract.outputs.fix_version }}
+      tickets: ${{ steps.extract.outputs.tickets }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Extract list the ticket numbers to be updated in Jira
+      - name: Extract the ticket numbers to be updated in Jira
         id: extract
         run: |
           set -euo pipefail
@@ -66,15 +69,16 @@ jobs:
           echo "Previous tag in series: $PREVIOUS_TAG"
 
           echo "Commits list between tags $PREVIOUS_TAG and $NEW_TAG:"
-          COMMIT_LOG=$(git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG")
-          echo "$COMMIT_LOG"
+          COMMITS=$(git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG")
+          echo "$COMMITS"
           
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag ${FIX_VERSION}:"
-          TICKET_LOG=$(echo "$COMMIT_LOG" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
-          echo "$TICKET_LOG"
+          TICKETS=$(echo "COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
+          echo "$TICKETS"
 
-          echo "::set-output name=fix_version::$FIX_VERSION"
-          echo "ticket_log=$TICKET_LOG" >> $GITHUB_OUTPUT
+          echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
+          echo "tickets=$TICKETS" >> $GITHUB_OUTPUT
+
 
       - name: Update Fix versions field for each JIRA ticket
 #        env:
@@ -83,7 +87,7 @@ jobs:
 #          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
         run: |
           FIX_VERSION="${{ steps.extract.outputs.fix_version }}"
-          echo "${{ steps.extract.outputs.ticket_log }}" | tr ',' '\n' | while read -r TICKET; do
+          echo "${{ steps.extract.outputs.tickets }}" | tr ',' '\n' | while read -r TICKET; do
             echo "Updating ticket: $TICKET with fix values: $FIX_VERSION"
           done
 
@@ -94,6 +98,43 @@ jobs:
 #          jira-username: "${{ secrets.JIRA_USERNAME }}"
 #          jira-api-token: "${{ secrets.JIRA_TOKEN }}"
 #          ticket-number:  ${{ steps.extract_issue_key.outputs.issue_key }}
+#          version-name: ${{ steps.chartVersion.outputs.data }}
+#          build-artifact: ontoplb
+#          exclude-patterns: "L2S-[0-9]+"
+
+
+
+#  prepare-matrix:
+#    needs: extract-list-of-ticket-numbers
+#    runs-on: ubuntu-latest
+#    outputs:
+#      matrix: ${{ steps.set-matrix.outputs.matrix }}
+#    steps:
+#      - name: Convert ticket_list to matrix
+#        id: set-matrix
+#        run: |
+#          TICKETS="${{ needs.extract-list-of-ticket-numbers.outputs.ticket_list }}"
+#          echo "TICKETS=$TICKETS"
+#          JSON=$(echo "$TICKETS" | tr ',' '\n' | jq -R . | jq -s 'map({ticket: .})')
+#          echo "matrix={\"include\": $JSON}" >> $GITHUB_OUTPUT
+#
+#  update-jira:
+#    needs: prepare-matrix
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+#    steps:
+#      - name: Set JIRA Fix versions
+#        id: chartVersion
+#        run: echo "data=${{ needs.update-jira-fix-versions.outputs.fix_version }}" >> "$GITHUB_OUTPUT"
+#
+#      - name: Run jira-bot for each ticket
+#        uses: Cumulocity-IoT/jira-bot@v1.1.1
+#        with:
+#          jira-url: https://cumulocity.atlassian.net
+#          jira-username: "${{ secrets.JIRA_USERNAME }}"
+#          jira-api-token: "${{ secrets.JIRA_TOKEN }}"
+#          ticket-number: ${{ matrix.ticket }}
 #          version-name: ${{ steps.chartVersion.outputs.data }}
 #          build-artifact: ontoplb
 #          exclude-patterns: "L2S-[0-9]+"
