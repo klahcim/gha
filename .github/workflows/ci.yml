@@ -98,11 +98,11 @@ jobs:
 
   update-jira:
     needs: [extract-data, prepare-data]
-    if: needs.prepare.outputs.matrix != '[]'
+    if: needs.prepare-data.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ticket: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+        ticket: ${{ fromJson(needs.prepare-data.outputs.matrix) }}
     steps:
       - name: Run jira-bot for updating the ticket ${{ matrix.ticket }} with fix version ${{ needs.extract-data.outputs.fix_version }}
         uses: Cumulocity-IoT/jira-bot@v1.1.1
