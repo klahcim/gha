@@ -73,7 +73,7 @@ jobs:
           echo "$COMMITS"
           
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag ${FIX_VERSION}:"
-          TICKETS=$(echo "COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
+          TICKETS=$(echo "$COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
           echo "$TICKETS"
 
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
