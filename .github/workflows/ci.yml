@@ -92,7 +92,7 @@ jobs:
           if [[ -z "$tickets" ]]; then
             echo "matrix=[]" >> $GITHUB_OUTPUT
           else
-            json_array=$(jq -n --arg tickets "$tickets" '$tickets | split(",")')
+            json_array=$(jq -c -n --arg tickets "$tickets" '$tickets | split(",")')
             echo "matrix=$json_array" >> $GITHUB_OUTPUT
           fi
 
