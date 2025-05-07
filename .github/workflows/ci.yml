@@ -13,14 +13,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: List the ticket numbers to be updated in Jira and set the 'Fix Version' field to the value obtained from the created tag.
+      - name: List the ticket numbers to be updated in Jira
         run: |
           set -euo pipefail
           
           TAG_PREFIX="core-"
-
+      
           NEW_TAG="${GITHUB_REF#refs/tags/}"
           echo "New tag: $NEW_TAG"
+          FIX_VERSION="${NEW_TAG#${TAG_PREFIX}}"
 
           if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
             SERIES_PREFIX="${BASH_REMATCH[1]}"
@@ -72,5 +73,18 @@ jobs:
           COMMIT_LOG=$(git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG")
           echo "$COMMIT_LOG"
           
-          echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag: ${NEW_TAG#${TAG_PREFIX}}"
-          echo "$COMMIT_LOG" | grep -oE 'MTM-[0-9]+' | sort -u
+          echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag: ${FIX_VERSION}"
+          TICKET_LOG=$(echo "$COMMIT_LOG" | grep -oE 'MTM-[0-9]+' | sort -u)
+          echo "TICKET_LOG"
+
+      - name: Update Fix versions field in JIRA for each ticket
+#        env:
+#          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+#          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+#          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          FIX_VERSION="${{ steps.extract.outputs.fix_version }}"
+          echo "${{ steps.extract.outputs.ticket_log }}" | while read -r TICKET; do
+            echo "Updating ticket: $TICKET with values: $FIX_VERSION"
+          done
+
