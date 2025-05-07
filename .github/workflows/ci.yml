@@ -13,7 +13,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: List the ticket numbers to be updated in Jira
+      - name: Extract list the ticket numbers to be updated in Jira
+        id: tickets
         run: |
           set -euo pipefail
           
@@ -64,18 +65,13 @@ jobs:
           PREVIOUS_TAG="${SERIES_TAGS[$((CURRENT_INDEX + 1))]}"
           echo "Previous tag in series: $PREVIOUS_TAG"
 
-          # Show the commit diff between the two tags
-          echo "Commits between:"
-          echo "$PREVIOUS_TAG"
-          echo "$NEW_TAG"
-
-          echo "Commits list:"
+          echo "Commits list between tags $PREVIOUS_TAG and $NEW_TAG:"
           COMMIT_LOG=$(git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG")
           echo "$COMMIT_LOG"
           
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag: ${FIX_VERSION}"
           TICKET_LOG=$(echo "$COMMIT_LOG" | grep -oE 'MTM-[0-9]+' | sort -u)
-          echo "TICKET_LOG"
+          echo "$TICKET_LOG"
 
       - name: Update Fix versions field in JIRA for each ticket
 #        env:
@@ -83,8 +79,8 @@ jobs:
 #          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
 #          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
         run: |
-          FIX_VERSION="${{ steps.extract.outputs.fix_version }}"
-          echo "${{ steps.extract.outputs.ticket_log }}" | while read -r TICKET; do
+          FIX_VERSION="${{ steps.tickets.outputs.fix_version }}"
+          echo "${{ steps.tickets.outputs.ticket_log }}" | while read -r TICKET; do
             echo "Updating ticket: $TICKET with values: $FIX_VERSION"
           done
 
