@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Extract the ticket numbers to be updated in Jira
+      - name: Extract the ticket numbers and fix version to be updated in Jira
         id: extract
         run: |
           set -euo pipefail
@@ -79,62 +79,18 @@ jobs:
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
           echo "tickets=$TICKETS" >> $GITHUB_OUTPUT
 
-
-      - name: Update Fix versions field for each JIRA ticket
-#        env:
-#          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-#          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
-#          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-        run: |
-          FIX_VERSION="${{ steps.extract.outputs.fix_version }}"
-          echo "${{ steps.extract.outputs.tickets }}" | tr ',' '\n' | while read -r TICKET; do
-            echo "Updating ticket: $TICKET with fix values: $FIX_VERSION"
-          done
-
-#      - uses: Cumulocity-IoT/jira-bot@v1.1.1
-#        if: ${{ steps.extract_issue_key.outputs.issue_key != '' }}
-#        with:
-#          jira-url: https://cumulocity.atlassian.net
-#          jira-username: "${{ secrets.JIRA_USERNAME }}"
-#          jira-api-token: "${{ secrets.JIRA_TOKEN }}"
-#          ticket-number:  ${{ steps.extract_issue_key.outputs.issue_key }}
-#          version-name: ${{ steps.chartVersion.outputs.data }}
-#          build-artifact: ontoplb
-#          exclude-patterns: "L2S-[0-9]+"
-
-
-
-#  prepare-matrix:
-#    needs: extract-list-of-ticket-numbers
-#    runs-on: ubuntu-latest
-#    outputs:
-#      matrix: ${{ steps.set-matrix.outputs.matrix }}
-#    steps:
-#      - name: Convert ticket_list to matrix
-#        id: set-matrix
-#        run: |
-#          TICKETS="${{ needs.extract-list-of-ticket-numbers.outputs.ticket_list }}"
-#          echo "TICKETS=$TICKETS"
-#          JSON=$(echo "$TICKETS" | tr ',' '\n' | jq -R . | jq -s 'map({ticket: .})')
-#          echo "matrix={\"include\": $JSON}" >> $GITHUB_OUTPUT
-#
-#  update-jira:
-#    needs: prepare-matrix
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
-#    steps:
-#      - name: Set JIRA Fix versions
-#        id: chartVersion
-#        run: echo "data=${{ needs.update-jira-fix-versions.outputs.fix_version }}" >> "$GITHUB_OUTPUT"
-#
-#      - name: Run jira-bot for each ticket
-#        uses: Cumulocity-IoT/jira-bot@v1.1.1
-#        with:
-#          jira-url: https://cumulocity.atlassian.net
-#          jira-username: "${{ secrets.JIRA_USERNAME }}"
-#          jira-api-token: "${{ secrets.JIRA_TOKEN }}"
-#          ticket-number: ${{ matrix.ticket }}
-#          version-name: ${{ steps.chartVersion.outputs.data }}
-#          build-artifact: ontoplb
-#          exclude-patterns: "L2S-[0-9]+"
+  update-jira:
+    needs: extract-data
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ticket: ${{ fromJson('["' + join('","', split(needs.extract-data.outputs.tickets, ',')) + '"]') }}
+    steps:
+      - name: Run jira-bot for updating the ticket ${{ matrix.ticket }} with fix version ${{ needs.extract-data.outputs.fix_version }}
+        uses: Cumulocity-IoT/jira-bot@v1.1.1
+        with:
+          jira-url: https://cumulocity.atlassian.net
+          jira-username: "${{ secrets.JIRA_USERNAME }}"
+          jira-api-token: "${{ secrets.JIRA_TOKEN }}"
+          ticket-number: ${{ matrix.ticket }}
+          version-name: ${{ needs.extract-data.outputs.fix_version }}
