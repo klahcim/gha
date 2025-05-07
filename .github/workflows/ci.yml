@@ -69,4 +69,8 @@ jobs:
           echo "$NEW_TAG"
 
           echo "Commits list:"
-          git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG"
+          COMMIT_LOG=$(git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG")
+          echo "$COMMIT_LOG"
+          
+          echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated:"
+          echo "$COMMIT_LOG" | grep -oE 'MTM-[0-9]+' | sort -u
