@@ -1,83 +1,72 @@
-name: Show release commits (debug)
+name: Update JIRA Fix versions
 
 on:
   create:
     tags: true
 
 jobs:
-  show_release_commits:
+  update-jira-fix-versions:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # potrzebne do pracy z tagami i historią commitów
+          fetch-depth: 0
 
-      - name: Show commits between two most recent tags in same series (with debug)
+      - name: List the ticket numbers to be updated in Jira and set the 'Fix Version' field to the value obtained from the created tag.
         run: |
           set -euo pipefail
+          
+          TAG_PREFIX="core-"
 
-          echo "✅ Start skryptu"
-
-          # Wyciągamy nazwę nowego taga (np. core-2025.73.0)
-          echo "🔍 GITHUB_REF: $GITHUB_REF"
           NEW_TAG="${GITHUB_REF#refs/tags/}"
-          echo "🆕 Nowy tag: $NEW_TAG"
+          echo "New tag: $NEW_TAG"
 
-          # Rozpoznajemy prefiks serii (np. core-2025.)
-          if [[ "$NEW_TAG" =~ ^(core-[0-9]+\.) ]]; then
+          if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
             SERIES_PREFIX="${BASH_REMATCH[1]}"
-            echo "📦 Rozpoznany prefiks serii: $SERIES_PREFIX"
+            echo "Detected series prefix: $SERIES_PREFIX"
           else
-            echo "❌ Tag '$NEW_TAG' nie pasuje do wzorca 'core-ROK.'. Przerywam."
+            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<YEAR>.' — exiting."
             exit 1
           fi
 
-          # Pobieramy i wyświetlamy wszystkie tagi w tej serii (debug)
-          echo "📄 Pobieram listę tagów w serii '$SERIES_PREFIX*'..."
           mapfile -t SERIES_TAGS < <(git tag --list "${SERIES_PREFIX}*" | sort -rV)
 
-          echo "📑 Wszystkie tagi w serii (posortowane malejąco):"
+          echo "Tags in the series (sorted descending):"
           for tag in "${SERIES_TAGS[@]}"; do
             echo "   - $tag"
           done
 
-          # Szukamy indeksu aktualnego taga
-          echo "🔍 Szukam indeksu tagu '$NEW_TAG' na liście..."
+          echo "Finding index of current tag '$NEW_TAG' in the series tags list."
           CURRENT_INDEX=-1
           for i in "${!SERIES_TAGS[@]}"; do
-            echo "   🔎 Porównuję: ${SERIES_TAGS[$i]}"
+            echo "Comparing with: ${SERIES_TAGS[$i]}"
             if [[ "${SERIES_TAGS[$i]}" == "$NEW_TAG" ]]; then
               CURRENT_INDEX=$i
-              echo "   ✅ Trafiony indeks: $CURRENT_INDEX"
+              echo "Found at index: $CURRENT_INDEX"
               break
             fi
           done
 
-          # Obsługa błędów: nie znaleziono taga
+          # Handle error if tag not found
           if (( CURRENT_INDEX == -1 )); then
-            echo "❌ Nie znaleziono tagu '$NEW_TAG' na liście. Kończę."
+            echo "Could not find tag '$NEW_TAG' in series — aborting."
             exit 1
           fi
 
-          # Sprawdzenie, czy jest poprzedni tag
+          # Check if there's a previous tag
           if (( CURRENT_INDEX + 1 >= ${#SERIES_TAGS[@]} )); then
-            echo "ℹ️ Brak starszego taga w tej serii — nie ma czego porównać."
+            echo "No earlier tag in the same series — nothing to compare."
             exit 0
           fi
 
-          # Pobieramy poprzedni tag
           PREVIOUS_TAG="${SERIES_TAGS[$((CURRENT_INDEX + 1))]}"
-          echo "⬅️ Poprzedni tag w serii: $PREVIOUS_TAG"
+          echo "Previous tag in series: $PREVIOUS_TAG"
 
-          # Wyświetlenie porównania tagów
-          echo "🧾 Commity pomiędzy:"
-          echo "   🔹 $PREVIOUS_TAG"
-          echo "   🔸 $NEW_TAG"
-          echo
+          # Show the commit diff between the two tags
+          echo "Commits between:"
+          echo "$PREVIOUS_TAG"
+          echo "$NEW_TAG"
 
-          # Pokazujemy commity
-          echo "📜 Commity między tagami:"
+          echo "Commits list:"
           git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG"
-
-          echo "✅ Koniec skryptu"
