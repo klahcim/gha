@@ -79,12 +79,30 @@ jobs:
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
           echo "tickets=$TICKETS" >> $GITHUB_OUTPUT
 
-  update-jira:
+  prepare-data:
     needs: extract-data
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.prepare.outputs.matrix }}
+    steps:
+      - name: Prepare ticket matrix from tickets list
+        id: prepare
+        run: |
+          tickets="${{ needs.extract-data.outputs.tickets }}"
+          if [[ -z "$tickets" ]]; then
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+          else
+            json_array=$(jq -n --arg tickets "$tickets" '$tickets | split(",")')
+            echo "matrix=$json_array" >> $GITHUB_OUTPUT
+          fi
+
+  update-jira:
+    needs: [extract-data, prepare-data]
+    if: needs.prepare.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ticket: ${{ fromJson('["' + join('","', split(needs.extract-data.outputs.tickets, ',')) + '"]') }}
+        ticket: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
       - name: Run jira-bot for updating the ticket ${{ matrix.ticket }} with fix version ${{ needs.extract-data.outputs.fix_version }}
         uses: Cumulocity-IoT/jira-bot@v1.1.1
