@@ -38,11 +38,11 @@ jobs:
             PATCH="${BASH_REMATCH[3]}"
           
             if [[ "$PATCH" == "0" ]]; then
-              # develop-style tag: series by MAJOR.MINOR
-              SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.${MINOR}"
+              # develop-series tag
+              SERIES_PREFIX="^${TAG_PREFIX}${MAJOR}\.[0-9]+\.0$"
             elif [[ "$MINOR" == "0" ]]; then
-              # release-style tag: series by MAJOR.0
-              SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.0"
+              # release-series tag
+              SERIES_PREFIX="^${TAG_PREFIX}${MAJOR}\.0\.[0-9]+$"
             else
               echo "Unrecognized version format for tag: $NEW_TAG"
               exit 1
@@ -54,7 +54,7 @@ jobs:
           fi
           
           # Get all tags in the same series, sorted in descending version order
-          mapfile -t SERIES_TAGS < <(git tag --list "${SERIES_PREFIX}*" | sort -rV)
+          mapfile -t SERIES_TAGS < <(git tag --list | grep -E "$SERIES_PREFIX" | sort -rV)
 
           echo "Tags in the series (sorted descending):"
           for tag in "${SERIES_TAGS[@]}"; do
