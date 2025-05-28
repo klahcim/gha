@@ -1,8 +1,10 @@
 name: Update JIRA Fix versions
 
+# Trigger: run this workflow only for release tags (tags with the "core-" prefix)
 on:
   create:
-    tags: true
+    tags:
+      - core-*
 
 jobs:
   extract-data:
@@ -22,47 +24,32 @@ jobs:
           set -euo pipefail
           
           TAG_PREFIX="core-"
-      
+          
+          # Extract the actual tag name (e.g., "core-2025.0.1")
           NEW_TAG="${GITHUB_REF#refs/tags/}"
           echo "New tag: $NEW_TAG"
-          FIX_VERSION="${NEW_TAG#${TAG_PREFIX}}"
-
-          if [[ "$NEW_TAG" =~ ^${TAG_PREFIX}([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-          MAJOR="${BASH_REMATCH[1]}"
-          MINOR="${BASH_REMATCH[2]}"
-          PATCH="${BASH_REMATCH[3]}"
           
-            if [[ "$PATCH" == "0" ]]; then
-            # develop-style tag: series by MAJOR.MINOR
-            SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.${MINOR}"
-            elif [[ "$MINOR" == "0" ]]; then
-            # release-style tag: series by MAJOR.0
-            SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.0"
-            else
-            echo "Unrecognized version format for tag: $NEW_TAG"
-            exit 1
-            fi
+          # Remove prefix from tag name to get the fix version (e.g., "2025.0.1")
+          FIX_VERSION="${NEW_TAG#${TAG_PREFIX}}"
+          
+          # Match tag format and extract the version series prefix (e.g., "core-2025.")
+          if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
+            SERIES_PREFIX="${BASH_REMATCH[1]}"
             echo "Detected series prefix: $SERIES_PREFIX"
           else
-          echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<X>.<Y>.<Z>' — exiting."
-          exit 1
+            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<RELEASE_NUMBER>.' — exiting."
+            exit 1
           fi
-
-#          if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
-#            SERIES_PREFIX="${BASH_REMATCH[1]}"
-#            echo "Detected series prefix: $SERIES_PREFIX"
-#          else
-#            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<YEAR>.' — exiting."
-#            exit 1
-#          fi
-
+          
+          # Get all tags in the same series, sorted in descending version order
           mapfile -t SERIES_TAGS < <(git tag --list "${SERIES_PREFIX}*" | sort -rV)
 
           echo "Tags in the series (sorted descending):"
           for tag in "${SERIES_TAGS[@]}"; do
             echo "   - $tag"
           done
-
+          
+          # Find the index of the current tag in the sorted list
           echo "Finding index of current tag '$NEW_TAG' in the series tags list."
           CURRENT_INDEX=-1
           for i in "${!SERIES_TAGS[@]}"; do
@@ -85,24 +72,29 @@ jobs:
             echo "No earlier tag in the same series — nothing to compare."
             exit 0
           fi
-
+          
+          # Identify the previous tag in the series
           PREVIOUS_TAG="${SERIES_TAGS[$((CURRENT_INDEX + 1))]}"
           echo "Previous tag in series: $PREVIOUS_TAG"
-
+          
+          # List commits between previous and current tag
           echo "Commits list between tags $PREVIOUS_TAG and $NEW_TAG:"
           COMMITS=$(git log --pretty=format:'%h %s' "$PREVIOUS_TAG..$NEW_TAG")
           echo "$COMMITS"
           
+          # Extract unique JIRA ticket keys (e.g., MTM-1234) from commit messages
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag ${FIX_VERSION}:"
           TICKETS=$(echo "$COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
           echo "$TICKETS"
-
+          
+          # Output values to be used in downstream jobs
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
           echo "tickets=$TICKETS" >> $GITHUB_OUTPUT
 
   prepare-data:
     needs: extract-data
     runs-on: ubuntu-latest
+    # Output: a JSON array of tickets for use in a matrix job
     outputs:
       matrix: ${{ steps.prepare.outputs.matrix }}
     steps:
@@ -110,17 +102,20 @@ jobs:
         id: prepare
         run: |
           tickets="${{ needs.extract-data.outputs.tickets }}"
+          # If no tickets, return an empty matrix
           if [[ -z "$tickets" ]]; then
             echo "matrix=[]" >> $GITHUB_OUTPUT
           else
+            # Convert comma-separated string to JSON array (e.g., ["MTM-1", "MTM-2"])
             json_array=$(jq -c -n --arg tickets "$tickets" '$tickets | split(",")')
             echo "matrix=$json_array" >> $GITHUB_OUTPUT
           fi
 
   update-jira:
-    needs: [extract-data, prepare-data]
+    needs: [prepare-data]
     if: needs.prepare-data.outputs.matrix != '[]'
     runs-on: ubuntu-latest
+    # Use a matrix strategy to run one job per ticket
     strategy:
       matrix:
         ticket: ${{ fromJson(needs.prepare-data.outputs.matrix) }}
