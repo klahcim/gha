@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       fix_version: ${{ steps.data.outputs.fix_version }}
-      matrix: ${{ steps.data.outputs.matrix }}
+      tickets_matrix: ${{ steps.data.outputs.tickets_matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -102,21 +102,21 @@ jobs:
           # Output values to be used in downstream job
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
           if [[ -z "$TICKETS" ]]; then
-            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "TICKETS_MATRIX=[]" >> $GITHUB_OUTPUT
           else
             # Convert comma-separated string to JSON array (e.g., ["MTM-1", "MTM-2"])
             json_array=$(jq -c -n --arg tickets "$TICKETS" '$tickets | split(",")')
-            echo "matrix=$json_array" >> $GITHUB_OUTPUT
+            echo "TICKETS_MATRIX=$json_array" >> $GITHUB_OUTPUT
           fi   
 
   update-jira:
     needs: [extract-data]
-    if: needs.extract-data.outputs.matrix != '[]'
+    if: needs.extract-data.outputs.tickets_matrix != '[]'
     runs-on: ubuntu-latest
     # Use a matrix strategy to run one job per ticket
     strategy:
       matrix:
-        ticket: ${{ fromJson(needs.extract-data.outputs.matrix) }}
+        ticket: ${{ fromJson(needs.extract-data.outputs.tickets_matrix) }}
     steps:
       - name: Run jira-bot for updating the ticket ${{ matrix.ticket }} with fix version ${{ needs.extract-data.outputs.fix_version }}
         uses: Cumulocity-IoT/jira-bot@v1.1.1
