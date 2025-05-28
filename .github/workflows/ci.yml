@@ -27,13 +27,34 @@ jobs:
           echo "New tag: $NEW_TAG"
           FIX_VERSION="${NEW_TAG#${TAG_PREFIX}}"
 
-          if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
-            SERIES_PREFIX="${BASH_REMATCH[1]}"
+          if [[ "$NEW_TAG" =~ ^${TAG_PREFIX}([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          
+            if [[ "$PATCH" == "0" ]]; then
+            # develop-style tag: series by MAJOR.MINOR
+            SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.${MINOR}"
+            elif [[ "$MINOR" == "0" ]]; then
+            # release-style tag: series by MAJOR.0
+            SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.0"
+            else
+            echo "Unrecognized version format for tag: $NEW_TAG"
+            exit 1
+            fi
             echo "Detected series prefix: $SERIES_PREFIX"
           else
-            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<YEAR>.' — exiting."
-            exit 1
+          echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<X>.<Y>.<Z>' — exiting."
+          exit 1
           fi
+
+#          if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
+#            SERIES_PREFIX="${BASH_REMATCH[1]}"
+#            echo "Detected series prefix: $SERIES_PREFIX"
+#          else
+#            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<YEAR>.' — exiting."
+#            exit 1
+#          fi
 
           mapfile -t SERIES_TAGS < <(git tag --list "${SERIES_PREFIX}*" | sort -rV)
 
