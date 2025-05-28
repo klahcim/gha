@@ -10,8 +10,8 @@ jobs:
   extract-data:
     runs-on: ubuntu-latest
     outputs:
-      fix_version: ${{ steps.extract.outputs.fix_version }}
-      matrix: ${{ steps.extract.outputs.matrix }}
+      fix_version: ${{ steps.data.outputs.fix_version }}
+      matrix: ${{ steps.data.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
