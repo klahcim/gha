@@ -32,12 +32,24 @@ jobs:
           # Remove prefix from tag name to get the fix version (e.g., "2025.0.1")
           FIX_VERSION="${NEW_TAG#${TAG_PREFIX}}"
           
-          # Match tag format and extract the version series prefix (e.g., "core-2025.")
-          if [[ "$NEW_TAG" =~ ^(${TAG_PREFIX}[0-9]+\.) ]]; then
-            SERIES_PREFIX="${BASH_REMATCH[1]}"
+          if [[ "$NEW_TAG" =~ ^${TAG_PREFIX}([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+          
+            if [[ "$PATCH" == "0" ]]; then
+              # develop-style tag: series by MAJOR.MINOR
+              SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.${MINOR}"
+            elif [[ "$MINOR" == "0" ]]; then
+              # release-style tag: series by MAJOR.0
+              SERIES_PREFIX="${TAG_PREFIX}${MAJOR}.0"
+            else
+              echo "Unrecognized version format for tag: $NEW_TAG"
+              exit 1
+            fi
             echo "Detected series prefix: $SERIES_PREFIX"
           else
-            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<RELEASE_NUMBER>.' — exiting."
+            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<X>.<Y>.<Z>' — exiting."
             exit 1
           fi
           
