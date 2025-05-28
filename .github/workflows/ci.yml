@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       fix_version: ${{ steps.extract.outputs.fix_version }}
-      tickets: ${{ steps.extract.outputs.tickets }}
+      matrix: ${{ steps.extract.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Extract the ticket numbers and fix version to be updated in Jira
-        id: extract
+        id: data
         run: |
           set -euo pipefail
           
@@ -98,39 +98,25 @@ jobs:
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag ${FIX_VERSION}:"
           TICKETS=$(echo "$COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
           echo "$TICKETS"
-          
-          # Output values to be used in downstream jobs
+               
+          # Output values to be used in downstream job
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
-          echo "tickets=$TICKETS" >> $GITHUB_OUTPUT
-
-  prepare-data:
-    needs: extract-data
-    runs-on: ubuntu-latest
-    # Output: a JSON array of tickets for use in a matrix job
-    outputs:
-      matrix: ${{ steps.prepare.outputs.matrix }}
-    steps:
-      - name: Prepare ticket matrix from tickets list
-        id: prepare
-        run: |
-          tickets="${{ needs.extract-data.outputs.tickets }}"
-          # If no tickets, return an empty matrix
-          if [[ -z "$tickets" ]]; then
+          if [[ -z "$TICKETS" ]]; then
             echo "matrix=[]" >> $GITHUB_OUTPUT
           else
             # Convert comma-separated string to JSON array (e.g., ["MTM-1", "MTM-2"])
-            json_array=$(jq -c -n --arg tickets "$tickets" '$tickets | split(",")')
+            json_array=$(jq -c -n --arg tickets "$TICKETS" '$TICKETS | split(",")')
             echo "matrix=$json_array" >> $GITHUB_OUTPUT
-          fi
+          fi   
 
   update-jira:
-    needs: [prepare-data]
-    if: needs.prepare-data.outputs.matrix != '[]'
+    needs: [extract-data]
+    if: needs.extract-data.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     # Use a matrix strategy to run one job per ticket
     strategy:
       matrix:
-        ticket: ${{ fromJson(needs.prepare-data.outputs.matrix) }}
+        ticket: ${{ fromJson(needs.extract-data.outputs.matrix) }}
     steps:
       - name: Run jira-bot for updating the ticket ${{ matrix.ticket }} with fix version ${{ needs.extract-data.outputs.fix_version }}
         uses: Cumulocity-IoT/jira-bot@v1.1.1
