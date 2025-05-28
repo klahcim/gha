@@ -105,7 +105,7 @@ jobs:
             echo "matrix=[]" >> $GITHUB_OUTPUT
           else
             # Convert comma-separated string to JSON array (e.g., ["MTM-1", "MTM-2"])
-            json_array=$(jq -c -n --arg $TICKETS "$TICKETS" '$TICKETS | split(",")')
+            json_array=$(jq -c -n --arg tickets "$TICKETS" '$tickets | split(",")')
             echo "matrix=$json_array" >> $GITHUB_OUTPUT
           fi   
 
