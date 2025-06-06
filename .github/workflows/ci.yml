@@ -41,15 +41,15 @@ jobs:
               # develop-series tag
               SERIES_PREFIX="^${TAG_PREFIX}${MAJOR}\.[0-9]+\.0$"
             elif [[ "$MINOR" == "0" ]]; then
-              # release-series tag
+              # new release-series tag
               SERIES_PREFIX="^${TAG_PREFIX}${MAJOR}\.0\.[0-9]+$"
             else
-              echo "Unrecognized version format for tag: $NEW_TAG"
-              exit 1
+              # old release-series (2024) tag          
+              SERIES_PREFIX="^${TAG_PREFIX}${MAJOR}\.${MINOR}\.[0-9]+$"
             fi
             echo "Detected series prefix: $SERIES_PREFIX"
           else
-            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<X>.<Y>.<Z>' — exiting."
+            echo "Tag '$NEW_TAG' does not match expected format '${TAG_PREFIX}<RELEASE_NUMBER>.' — exiting."
             exit 1
           fi
           
@@ -63,30 +63,10 @@ jobs:
           
           # Find the index of the current tag in the sorted list
           echo "Finding index of current tag '$NEW_TAG' in the series tags list."
-          CURRENT_INDEX=-1
-          for i in "${!SERIES_TAGS[@]}"; do
-            echo "Comparing with: ${SERIES_TAGS[$i]}"
-            if [[ "${SERIES_TAGS[$i]}" == "$NEW_TAG" ]]; then
-              CURRENT_INDEX=$i
-              echo "Found at index: $CURRENT_INDEX"
-              break
-            fi
-          done
-
-          # Handle error if tag not found
-          if (( CURRENT_INDEX == -1 )); then
-            echo "Could not find tag '$NEW_TAG' in series — aborting."
-            exit 1
-          fi
-
-          # Check if there's a previous tag
-          if (( CURRENT_INDEX + 1 >= ${#SERIES_TAGS[@]} )); then
-            echo "No earlier tag in the same series — nothing to compare."
-            exit 0
-          fi
-          
-          # Identify the previous tag in the series
-          PREVIOUS_TAG="${SERIES_TAGS[$((CURRENT_INDEX + 1))]}"
+          PREVIOUS_TAG=$(printf "%s\n" "${SERIES_TAGS[@]}" | awk -v tag="$NEW_TAG" '
+            $0 == tag { found = 1; next }
+            found { print; exit }
+          ')
           echo "Previous tag in series: $PREVIOUS_TAG"
           
           # List commits between previous and current tag
@@ -98,7 +78,7 @@ jobs:
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag ${FIX_VERSION}:"
           TICKETS=$(echo "$COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
           echo "$TICKETS"
-               
+          
           # Output values to be used in downstream job
           echo "fix_version=$FIX_VERSION" >> $GITHUB_OUTPUT
           if [[ -z "$TICKETS" ]]; then
