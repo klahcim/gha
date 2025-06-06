@@ -57,14 +57,14 @@ jobs:
           SERIES_TAGS=$(git tag --list | grep -E "$SERIES_PREFIX" | sort -rV)
           
           echo "Tags in the series (sorted descending):"
-          echo "SERIES_TAGS" | while read -r tag; do
+          echo "$SERIES_TAGS" | while read -r tag; do
             echo "   - $tag"
           done
           
           # Find the previous tag in the same release series by locating the current tag in the sorted list,
           # then selecting the next line (which represents the earlier tag, since the list is sorted in descending order)
           echo "Finding previous tag for current tag '$NEW_TAG' in the series tags list."
-          PREVIOUS_TAG=$(echo "SERIES_TAGS" | awk -v tag="$NEW_TAG" '
+          PREVIOUS_TAG=$(echo "$SERIES_TAGS" | awk -v tag="$NEW_TAG" '
             $0 == tag { found = 1; next }
             found { print; exit }
           ')
