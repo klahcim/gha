@@ -1,3 +1,14 @@
+# Example:
+# Suppose the repository has tags: core-2025.0.3, core-2025.0.2, core-2025.0.1
+# (sorted descending by version). If triggered for core-2025.0.2, the script
+# finds this tag in the list and selects the next one (core-2025.0.1) as the previous tag.
+#
+# It then lists commits between the previous tag and the current tag (e.g., core-2025.0.1..core-2025.0.2),
+# extracting JIRA ticket IDs from those commit messages.
+#
+# Finally, for each extracted ticket, the workflow updates the corresponding Jira issue,
+# adding the new fix version (derived from the tag) as a Fix Version in Jira.
+
 name: Update JIRA Fix versions
 
 # Trigger: run this workflow only for release tags (tags with the "core-" prefix)
