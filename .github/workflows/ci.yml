@@ -61,13 +61,20 @@ jobs:
             echo "   - $tag"
           done
           
-          # Find the index of the current tag in the sorted list
-          echo "Finding index of current tag '$NEW_TAG' in the series tags list."
+          # Find the previous tag in the same release series by locating the current tag in the sorted list,
+          # then selecting the next line (which represents the earlier tag, since the list is sorted in descending order)
+          echo "Finding previous tag for current tag '$NEW_TAG' in the series tags list."
           PREVIOUS_TAG=$(printf "%s\n" "${SERIES_TAGS[@]}" | awk -v tag="$NEW_TAG" '
             $0 == tag { found = 1; next }
             found { print; exit }
           ')
           echo "Previous tag in series: $PREVIOUS_TAG"
+          
+          # Handle case where no previous tag exists
+          if [[ -z "$PREVIOUS_TAG" ]]; then
+            echo "No previous tag for $NEW_TAG in the same series — nothing to compare."
+            exit 0
+          fi          
           
           # List commits between previous and current tag
           echo "Commits list between tags $PREVIOUS_TAG and $NEW_TAG:"
