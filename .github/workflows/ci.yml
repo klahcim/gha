@@ -54,27 +54,28 @@ jobs:
           fi
           
           # Get all tags in the same series, sorted in descending version order
-          mapfile -t SERIES_TAGS < <(git tag --list | grep -E "$SERIES_PREFIX" | sort -rV)
-
+          SERIES_TAGS=$(git tag --list | grep -E "$SERIES_PREFIX" | sort -rV)
+          
           echo "Tags in the series (sorted descending):"
-          for tag in "${SERIES_TAGS[@]}"; do
+          echo "SERIES_TAGS" | while read -r tag; do
             echo "   - $tag"
           done
           
           # Find the previous tag in the same release series by locating the current tag in the sorted list,
           # then selecting the next line (which represents the earlier tag, since the list is sorted in descending order)
           echo "Finding previous tag for current tag '$NEW_TAG' in the series tags list."
-          PREVIOUS_TAG=$(printf "%s\n" "${SERIES_TAGS[@]}" | awk -v tag="$NEW_TAG" '
+          PREVIOUS_TAG=$(echo "SERIES_TAGS" | awk -v tag="$NEW_TAG" '
             $0 == tag { found = 1; next }
             found { print; exit }
           ')
-          echo "Previous tag in series: $PREVIOUS_TAG"
-          
-          # Handle case where no previous tag exists
-          if [[ -z "$PREVIOUS_TAG" ]]; then
+
+          # Handle case with or without a previous tag
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            echo "Previous tag in series: $PREVIOUS_TAG"
+          else
             echo "No previous tag for $NEW_TAG in the same series — nothing to compare."
             exit 0
-          fi          
+          fi
           
           # List commits between previous and current tag
           echo "Commits list between tags $PREVIOUS_TAG and $NEW_TAG:"
