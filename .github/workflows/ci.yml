@@ -95,7 +95,7 @@ jobs:
           
           # Extract unique JIRA ticket keys (e.g., MTM-1234) from commit messages
           echo "Extracted JIRA ticket references (format: MTM-<digits>) to be updated with tag ${FIX_VERSION}:"
-          TICKETS=$(echo "$COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," -)
+          TICKETS=$(echo "$COMMITS" | grep -oE 'MTM-[0-9]+' | sort -u | paste -sd "," - || true)
           echo "$TICKETS"
           
           # Output values to be used in downstream job
